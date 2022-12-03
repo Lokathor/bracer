@@ -215,7 +215,7 @@ macro_rules! when {
   }) => {
     concat!(
       concat!("cmp ", $reg, ", ", $op2, "\n"),
-      concat!("bhs ", $label, "f\n"),
+      concat!("bcs ", $label, "f\n"), // cs / hs gives unsigned GE
       $( concat!($asm_line, "\n") ),* ,
       concat!($label, ":\n"),
     )
@@ -224,7 +224,7 @@ macro_rules! when {
 
 #[test]
 fn test_when() {
-  let expected = "cmp r6, #32\nbhs 2f\nmov r0, #0\n2:\n";
+  let expected = "cmp r6, #32\nbcs 2f\nmov r0, #0\n2:\n";
 
   let actual = when!("r6" >=u "#32" [label_id=2] { "mov r0, #0" });
 
