@@ -210,4 +210,23 @@ macro_rules! when {
       concat!($label, ":\n"),
     )
   };
+  ($reg:literal >=u $op2:literal [label_id=$label:literal] {
+    $($asm_line:expr),* $(,)?
+  }) => {
+    concat!(
+      concat!("cmp ", $reg, ", ", $op2, "\n"),
+      concat!("bhs ", $label, "f\n"),
+      $( concat!($asm_line, "\n") ),* ,
+      concat!($label, ":\n"),
+    )
+  };
+}
+
+#[test]
+fn test_when() {
+  let expected = "cmp r6, #32\nbhs 2f\nmov r0, #0\n2:\n";
+
+  let actual = when!("r6" >=u "#32" [label_id=2] { "mov r0, #0" });
+
+  assert_eq!(expected, actual);
 }
