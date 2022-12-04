@@ -188,6 +188,8 @@ macro_rules! set_cpu_control {
 /// Currently supports:
 /// * `$reg == $op2`
 /// * `$reg != $op2`
+/// * `$reg >=u $op2`
+/// * `$reg <=u $op2`
 #[macro_export]
 macro_rules! when {
   ($reg:literal == $op2:literal [label_id=$label:literal] {
@@ -215,7 +217,17 @@ macro_rules! when {
   }) => {
     concat!(
       concat!("cmp ", $reg, ", ", $op2, "\n"),
-      concat!("bcs ", $label, "f\n"), // cs / hs gives unsigned GE
+      concat!("bcc ", $label, "f\n"), // cc: Unsigned LT
+      $( concat!($asm_line, "\n") ),* ,
+      concat!($label, ":\n"),
+    )
+  };
+  ($reg:literal <=u $op2:literal [label_id=$label:literal] {
+    $($asm_line:expr),* $(,)?
+  }) => {
+    concat!(
+      concat!("cmp ", $reg, ", ", $op2, "\n"),
+      concat!("bhi ", $label, "f\n"), // hi: Unsigned GT
       $( concat!($asm_line, "\n") ),* ,
       concat!($label, ":\n"),
     )
@@ -224,7 +236,7 @@ macro_rules! when {
 
 #[test]
 fn test_when() {
-  let expected = "cmp r6, #32\nbcs 2f\nmov r0, #0\n2:\n";
+  let expected = "cmp r6, #32\nbcc 2f\nmov r0, #0\n2:\n";
 
   let actual = when!("r6" >=u "#32" [label_id=2] { "mov r0, #0" });
 
