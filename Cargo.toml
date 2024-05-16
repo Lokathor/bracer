@@ -1,9 +1,10 @@
 [package]
 name = "bracer"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 repository = "https://github.com/Lokathor/bracer"
 description = "Macros to help write ARM assembly"
 license = "Zlib OR Apache-2.0 OR MIT"
 
-[dependencies]
+[lib]
+proc-macro = true
