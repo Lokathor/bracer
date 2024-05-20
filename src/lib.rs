@@ -174,6 +174,10 @@ pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
 ///
 /// The input sequence should be zero or more expressions (comma separated) that
 /// could each normally be used within an `asm!` block.
+///
+/// ## Safety
+/// You **must not** use this within an `a32` encoded assembly block. It will
+/// leave the assembler in a bad state after the assembly string, which is UB.
 #[proc_macro]
 pub fn a32_within_t32(token_stream: TokenStream) -> TokenStream {
   // Note(Lokathor): The output of this macro has to be "one expression", so we
