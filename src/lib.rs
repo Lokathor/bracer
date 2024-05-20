@@ -1,7 +1,17 @@
-extern crate proc_macro;
-use core::sync::atomic::{AtomicU64, Ordering};
+#![allow(unused_imports)]
+#![allow(unused_mut)]
 
-use proc_macro::{Literal, TokenStream, TokenTree};
+extern crate proc_macro;
+use core::{
+  fmt::Write,
+  str::FromStr,
+  sync::atomic::{AtomicU64, Ordering},
+};
+
+use proc_macro::{
+  Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream,
+  TokenTree,
+};
 
 const SPSR_ALLOWED_TARGET_REG_LIST: &[&str] = &[
   "r0", "R0", "r1", "R1", "r2", "R2", "r3", "R3", "r4", "R4", "r5", "R5", "r6",
@@ -151,4 +161,60 @@ pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
   );
 
   TokenStream::from(TokenTree::Literal(Literal::string(&output)))
+}
+
+/// Places `.code 32` at the start and `.code 16` at the end of the input
+/// sequence.
+///
+/// The input sequence should be zero or more expressions (comma separated) that
+/// could each normally be used within an `asm!` block.
+#[proc_macro]
+pub fn a32_within_t32(token_stream: TokenStream) -> TokenStream {
+  // Note(Lokathor): The output of this macro has to be "one expression", so we
+  // look through the comma separated list of input expressions and then re-emit
+  // everything as a single `concat!` expresion. For each input expression we
+  // get, we want to put that expression followed by a newline into the output
+  // `concat!`. The trick is that we need to be careful about where all the
+  // commas are, because having two commas in a row within the `concat!`
+  // argument list will cause an error.
+  let mut group_buffer: Vec<TokenTree> = Vec::new();
+  group_buffer.push(TokenTree::Literal(Literal::string(".code 32\n")));
+  group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+  for token_tree in token_stream {
+    // We want the input of this proc-macro to "act like" you were giving input
+    // directly to the `asm!` macro. This means that each comma between the
+    // input expressions has to act like a newline within the fully concatinated
+    // output. Whenever we see a comma in the input, we insert that *and also*
+    // we insert a newline character (followed by a comma for the newline
+    // character's expression).
+    match token_tree {
+      TokenTree::Punct(p) if p == ',' => {
+        group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        group_buffer.push(TokenTree::Literal(Literal::character('\n')));
+        group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+      }
+      _ => {
+        group_buffer.push(token_tree);
+      }
+    }
+  }
+  // check for a trailing comma in our group, if we DO NOT see one then we have
+  // to apply a fix before placing the literal for the final `.code 16` line.
+  if !matches!(group_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
+    group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+    group_buffer.push(TokenTree::Literal(Literal::character('\n')));
+    group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+  }
+  group_buffer.push(TokenTree::Literal(Literal::string(".code 16\n")));
+
+  let concat_expr = vec![
+    TokenTree::Ident(Ident::new("concat", Span::call_site())),
+    TokenTree::Punct(Punct::new('!', Spacing::Alone)),
+    TokenTree::Group(Group::new(
+      Delimiter::Parenthesis,
+      TokenStream::from_iter(group_buffer),
+    )),
+  ];
+
+  TokenStream::from_iter(concat_expr)
 }
