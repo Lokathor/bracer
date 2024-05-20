@@ -7,7 +7,6 @@ use core::{
   str::FromStr,
   sync::atomic::{AtomicU64, Ordering},
 };
-
 use proc_macro::{
   Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream,
   TokenTree,
@@ -18,13 +17,19 @@ const SPSR_ALLOWED_TARGET_REG_LIST: &[&str] = &[
   "R6", "r7", "R7", "r8", "R8", "r9", "R9", "r10", "R10", "r11", "R11", "r12",
   "R12", "r14", "R14", "lr", "LR",
 ];
+
 const ANY_REG_NAME: &[&str] = &[
   "r0", "R0", "r1", "R1", "r2", "R2", "r3", "R3", "r4", "R4", "r5", "R5", "r6",
   "R6", "r7", "R7", "r8", "R8", "r9", "R9", "r10", "R10", "r11", "R11", "r12",
   "R12", "r13", "R13", "r14", "R14", "r15", "R15", "lr", "LR", "pc", "PC",
 ];
 
-fn get_str_literal(tree: &TokenTree) -> Option<String> {
+/// Strips the double quotes from a string literal.
+///
+/// ## Failure
+/// * If the input isn't a `Literal`, or it is a `Literal` but doesn't start and
+///   end with `"` when formatted, then you get `None`.
+fn get_str_literal_content(tree: &TokenTree) -> Option<String> {
   match tree {
     TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
     TokenTree::Literal(l) => {
@@ -38,6 +43,7 @@ fn get_str_literal(tree: &TokenTree) -> Option<String> {
   }
 }
 
+/// Generates a unique "local" label string.
 fn next_local_label() -> String {
   static NEXT: AtomicU64 = AtomicU64::new(0);
   format!(".L_bracer_local_label_{}", NEXT.fetch_add(1, Ordering::Relaxed))
@@ -75,7 +81,8 @@ pub fn read_spsr(token_stream: TokenStream) -> TokenStream {
     [tree] => tree,
     _ => panic!("please provide only a single ident or string literal"),
   };
-  let reg_name = get_str_literal(tree).expect("input must be a string literal");
+  let reg_name =
+    get_str_literal_content(tree).expect("input must be a string literal");
   if !SPSR_ALLOWED_TARGET_REG_LIST.contains(&reg_name.as_str()) {
     panic!("register name `{reg_name}` is not on the permitted list")
   }
@@ -116,7 +123,8 @@ pub fn write_spsr(token_stream: TokenStream) -> TokenStream {
     [tree] => tree,
     _ => panic!("please provide only a single ident or string literal"),
   };
-  let reg_name = get_str_literal(tree).expect("input must be a string literal");
+  let reg_name =
+    get_str_literal_content(tree).expect("input must be a string literal");
   if !SPSR_ALLOWED_TARGET_REG_LIST.contains(&reg_name.as_str()) {
     panic!("register name `{reg_name}` is not on the permitted list")
   }
@@ -146,7 +154,8 @@ pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
     [tree] => tree,
     _ => panic!("please provide only a single ident or string literal"),
   };
-  let reg_name = get_str_literal(tree).expect("input must be a string literal");
+  let reg_name =
+    get_str_literal_content(tree).expect("input must be a string literal");
   if !ANY_REG_NAME.contains(&reg_name.as_str()) {
     panic!("register name `{reg_name}` is not on the permitted list")
   }
