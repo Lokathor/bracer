@@ -38,12 +38,9 @@ fn get_str_literal(tree: &TokenTree) -> Option<String> {
   }
 }
 
-fn next_u64() -> u64 {
-  static NEXT: AtomicU64 = AtomicU64::new(0);
-  NEXT.fetch_add(1, Ordering::Relaxed)
-}
 fn next_local_label() -> String {
-  format!(".L_bracer_local_label_{}", next_u64())
+  static NEXT: AtomicU64 = AtomicU64::new(0);
+  format!(".L_bracer_local_label_{}", NEXT.fetch_add(1, Ordering::Relaxed))
 }
 
 /// Reads SPSR to a named register.
