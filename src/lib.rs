@@ -228,3 +228,82 @@ pub fn a32_within_t32(token_stream: TokenStream) -> TokenStream {
 
   TokenStream::from_iter(concat_expr)
 }
+
+/// Generates the asm string to set the CPU control bits.
+///
+/// Input must be of the form: `{mode_name}, irq_masked: {bool}, fiq_masked:
+/// {bool}`
+///
+/// Valid mode names are the long name or short name of a CPU mode:
+/// * User / usr
+/// * FIQ / fiq
+/// * IRQ / irq
+/// * Supervisor / svc
+/// * System / sys
+///
+/// ## Assembly Safety
+/// This instruction can only be used in `a32` code.
+#[proc_macro]
+pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
+  let mut stream_iter = token_stream.into_iter();
+  // CPSR low bits are: `I F T MMMMM`, and T must always be left as 0.
+  let mode =
+    match stream_iter.next().expect("too few tokens").to_string().as_str() {
+      "User" | "usr" => "10000",
+      "FIQ" | "fiq" => "10001",
+      "IRQ" | "irq" => "10010",
+      "Supervisor" | "svc" => "10011",
+      "System" | "sys" => "11111",
+      other => {
+        panic!("First argument must be a valid cpu mode name, got `{other}`")
+      }
+    };
+  assert_eq!(
+    stream_iter.next().expect("too few tokens").to_string(),
+    ",",
+    "must have comma after the first arg"
+  );
+
+  assert_eq!(
+    stream_iter.next().expect("too few tokens").to_string(),
+    "irq_masked",
+    "second setting must be `irq_masked`"
+  );
+  assert_eq!(
+    stream_iter.next().expect("too few tokens").to_string(),
+    ":",
+    "after `irq_masked` must be a `:`"
+  );
+  let i = match stream_iter.next().expect("too few tokens").to_string().as_str()
+  {
+    "true" => "1",
+    "false" => "0",
+    _ => panic!("`irq_masked` must be set as `true` or `false`"),
+  };
+  assert_eq!(
+    stream_iter.next().expect("too few tokens").to_string(),
+    ",",
+    "must have comma after the second arg"
+  );
+
+  assert_eq!(
+    stream_iter.next().expect("too few tokens").to_string(),
+    "fiq_masked",
+    "third setting must be `fiq_masked`"
+  );
+  assert_eq!(
+    stream_iter.next().expect("too few tokens").to_string(),
+    ":",
+    "after `fiq_masked` must be a `:`"
+  );
+  let f = match stream_iter.next().expect("too few tokens").to_string().as_str()
+  {
+    "true" => "1",
+    "false" => "0",
+    _ => panic!("`fiq_masked` must be set as `true` or `false`"),
+  };
+  assert!(stream_iter.next().is_none(), "too many tokens");
+  TokenStream::from_iter(Some(TokenTree::Literal(Literal::string(&format!(
+    "msr CPSR_c, #0b{i}{f}0{mode}"
+  )))))
+}

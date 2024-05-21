@@ -1,4 +1,6 @@
-use bracer::{a32_fake_blx, a32_within_t32, read_spsr, write_spsr};
+use bracer::{
+  a32_fake_blx, a32_within_t32, read_spsr, set_cpu_control, write_spsr,
+};
 
 #[test]
 fn test_read_spsr() {
@@ -79,5 +81,17 @@ fn test_a32_within_t32() {
   // test that the macro works on an empty input sequence.
   let expected = ".code 32\n.code 16\n";
   let actual = a32_within_t32!();
+  assert_eq!(expected, actual);
+}
+
+#[test]
+fn test_set_cpu_control() {
+  let expected = "msr CPSR_c, #0b00011111";
+  let actual = set_cpu_control!(System, irq_masked: false, fiq_masked: false);
+  assert_eq!(expected, actual);
+
+  let expected = "msr CPSR_c, #0b10010011";
+  let actual =
+    set_cpu_control!(Supervisor, irq_masked: true, fiq_masked: false);
   assert_eq!(expected, actual);
 }
