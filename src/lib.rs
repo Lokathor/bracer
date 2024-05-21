@@ -1,5 +1,13 @@
+#![warn(missing_docs)]
 #![allow(unused_imports)]
 #![allow(unused_mut)]
+
+//! Various macros to help write inline assembly for ARM targets.
+//!
+//! These macros help you get your assembly written, but they have nearly no
+//! ability to help ensure that your assembly is correct. In rare cases where
+//! something can be statically known to be "obviously" wrong (eg: an invalid
+//! register name is picked for a specific instruction) the macro will panic.
 
 extern crate proc_macro;
 use core::{
