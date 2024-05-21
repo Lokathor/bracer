@@ -1,19 +1,20 @@
 use bracer::{
-  a32_fake_blx, a32_within_t32, put_fn_in_section, read_spsr, set_cpu_control,
-  when, write_spsr,
+  a32_fake_blx, a32_within_t32, put_fn_in_section, read_spsr_to,
+  set_cpu_control, when, write_spsr_from,
 };
 
 #[test]
-fn test_read_spsr() {
-  assert_eq!(read_spsr!("r0"), "mrs r0, SPSR");
-  assert_eq!(read_spsr!("R0"), "mrs R0, SPSR");
-  assert_eq!(read_spsr!("lr"), "mrs lr, SPSR");
+fn test_read_spsr_to() {
+  assert_eq!(read_spsr_to!("r0"), "mrs r0, SPSR");
+  assert_eq!(read_spsr_to!("R0"), "mrs R0, SPSR");
+  assert_eq!(read_spsr_to!("lr"), "mrs lr, SPSR");
+  assert_eq!(read_spsr_to!("{temp}"), "mrs {temp}, SPSR");
 
   unsafe {
     core::arch::asm!(
       // rustfmt stop making this one line
       "/*",
-      read_spsr!("r0"),
+      read_spsr_to!("r0"),
       "*/",
       options(nostack)
     )
@@ -21,10 +22,11 @@ fn test_read_spsr() {
 }
 
 #[test]
-fn test_write_spsr() {
-  assert_eq!(write_spsr!("r0"), "msr r0, SPSR");
-  assert_eq!(write_spsr!("R0"), "msr R0, SPSR");
-  assert_eq!(write_spsr!("lr"), "msr lr, SPSR");
+fn test_write_spsr_from() {
+  assert_eq!(write_spsr_from!("r0"), "msr r0, SPSR");
+  assert_eq!(write_spsr_from!("R0"), "msr R0, SPSR");
+  assert_eq!(write_spsr_from!("lr"), "msr lr, SPSR");
+  assert_eq!(write_spsr_from!("{temp}"), "msr {temp}, SPSR");
 }
 
 #[test]
@@ -58,7 +60,7 @@ fn test_a32_within_t32() {
         // rustfmt stop making this one line
         "add r0, r0, r0",
         // make sure that we can call other macros within this macro
-        read_spsr!("r0"),
+        read_spsr_to!("r0"),
       ),
       "*/",
       options(nostack)

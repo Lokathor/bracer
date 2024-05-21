@@ -9,13 +9,7 @@
 //! something can be statically known to be "obviously" wrong (eg: an invalid
 //! register name is picked for a specific instruction) the macro will panic.
 
-/*
-
-TODO:
-when
-with_pushed_registers
-
-*/
+/* TODO: with_pushed_registers */
 
 extern crate proc_macro;
 use core::{
@@ -28,49 +22,11 @@ use proc_macro::{
   TokenTree,
 };
 
-const SPSR_ALLOWED_TARGET_REG_LIST: &[&str] = &[
-  "r0", "R0", "r1", "R1", "r2", "R2", "r3", "R3", "r4", "R4", "r5", "R5", "r6",
-  "R6", "r7", "R7", "r8", "R8", "r9", "R9", "r10", "R10", "r11", "R11", "r12",
-  "R12", "r14", "R14", "lr", "LR",
-];
-
-const ANY_REG_NAME: &[&str] = &[
-  "r0", "R0", "r1", "R1", "r2", "R2", "r3", "R3", "r4", "R4", "r5", "R5", "r6",
-  "R6", "r7", "R7", "r8", "R8", "r9", "R9", "r10", "R10", "r11", "R11", "r12",
-  "R12", "r13", "R13", "r14", "R14", "r15", "R15", "lr", "LR", "pc", "PC",
-];
-
-/// Strips the double quotes from a string literal.
-///
-/// ## Failure
-/// * If the input isn't a `Literal`, or it is a `Literal` but doesn't start and
-///   end with `"` when formatted, then you get `None`.
-fn get_str_literal_content(tree: &TokenTree) -> Option<String> {
-  match tree {
-    TokenTree::Group(_) | TokenTree::Ident(_) | TokenTree::Punct(_) => None,
-    TokenTree::Literal(l) => {
-      let string = format!("{l}");
-      if string.starts_with('"') && string.ends_with('"') {
-        Some(string[..string.len() - 1][1..].to_string())
-      } else {
-        None
-      }
-    }
-  }
-}
-
-fn as_group(tree: TokenTree) -> Option<Group> {
-  match tree {
-    TokenTree::Group(g) => Some(g),
-    _ => None,
-  }
-}
-fn as_punct(tree: TokenTree) -> Option<Punct> {
-  match tree {
-    TokenTree::Punct(p) => Some(p),
-    _ => None,
-  }
-}
+mod a32_fake_blx_impl;
+mod read_spsr_to_impl;
+mod util;
+mod write_spsr_from_impl;
+use util::*;
 
 /// Generates a unique "local" label string.
 fn next_local_label() -> String {
@@ -78,100 +34,58 @@ fn next_local_label() -> String {
   format!(".L_bracer_local_label_{}", NEXT.fetch_add(1, Ordering::Relaxed))
 }
 
-/// Reads SPSR to a named register.
+/// Reads SPSR to the register given.
 ///
-/// This evaluates to a string literal for the following assembly:
+/// ## Input
+/// A single string literal that's an actual register name (eg: `"r0"`), or an
+/// assembly register substitution name (eg: `"{temp}"`).
 ///
-/// ```arm
-/// mrs <reg>, SPSR   // 'move register <-- special'
-/// ```
-///
-/// Input should be a string literal naming the register you want to store the
-/// SPSR value in.
-///
-/// ## Panics
-/// * If the target register isn't allowed to be used with the `mrs`
-///   instruction, this will panic. You can use `r0` through `r12`, and `lr`
-///   (aka `r14`). You can also use any of those registers written with
-///   uppercase.
+/// ## Output
+/// This expands to one line of assembly using the [`mrs`][mrs_docs] instruction
+/// to read SPSR to the named register.
 ///
 /// ## Assembly Safety
-/// * From the [ARM Docs]: *You must not attempt to access the SPSR when the
+/// * From the `mrs` Docs: *You must not attempt to access the SPSR when the
 ///   processor is in User or System mode. This is your responsibility. The
 ///   assembler cannot warn you about this, because it has no information about
 ///   the processor mode at execution time.*
 ///
-/// [ARM Docs]:
-///     https://developer.arm.com/documentation/dui0489/i/arm-and-thumb-instructions/mrs--psr-to-general-purpose-register-
+/// [mrs_docs]: https://developer.arm.com/documentation/dui0473/m/arm-and-thumb-instructions/mrs--system-coprocessor-register-to-arm-register-
 #[proc_macro]
-pub fn read_spsr(token_stream: TokenStream) -> TokenStream {
-  let trees: Vec<TokenTree> = token_stream.into_iter().collect();
-  let tree = match &trees[..] {
-    [tree] => tree,
-    _ => panic!("please provide only a single ident or string literal"),
-  };
-  let reg_name =
-    get_str_literal_content(tree).expect("input must be a string literal");
-  if !SPSR_ALLOWED_TARGET_REG_LIST.contains(&reg_name.as_str()) {
-    panic!("register name `{reg_name}` is not on the permitted list")
-  }
-  let output = format!("mrs {reg_name}, SPSR");
-
-  TokenStream::from(TokenTree::Literal(Literal::string(&output)))
+pub fn read_spsr_to(token_stream: TokenStream) -> TokenStream {
+  read_spsr_to_impl::read_spsr_to_impl(token_stream)
 }
 
-/// Writes SPSR from a named register.
+/// Writes SPSR from the register given.
 ///
-/// This evaluates to a string literal for the following assembly:
+/// ## Input
+/// A single string literal that's an actual register name (eg: `"r0"`), or an
+/// assembly register substitution name (eg: `"{temp}"`).
 ///
-/// ```arm
-/// msr <reg>, SPSR   // 'move special <-- register'
-/// ```
-///
-/// Input should be a string literal naming the register that holds the value
-/// you want to write to SPSR.
-///
-/// ## Panics
-/// * If the target register isn't allowed to be used with the `msr`
-///   instruction, this will panic. You can use `r0` through `r12`, and `lr`
-///   (aka `r14`). You can also use any of those registers written with
-///   uppercase.
+/// ## Output
+/// This expands to one line of assembly using the [`msr`][msr_docs] instruction
+/// to write SPSR from the named register.
 ///
 /// ## Assembly Safety
-/// * From the [ARM Docs]: *You must not attempt to access the SPSR when the
-///   processor is in User or System mode. This is your responsibility. The
-///   assembler cannot warn you about this, because it has no information about
-///   the processor mode at execution time.*
+/// * The `mrs` docs warn you not to use `mrs` to access SPSR when in User or
+///   System mode. The related `msr` instruction generated by this macro should
+///   likely *also* not be used when in User or System mode. See
+///   [`read_spsr_to`].
 ///
-/// [ARM Docs]:
-///     https://developer.arm.com/documentation/dui0489/i/arm-and-thumb-instructions/mrs--psr-to-general-purpose-register-
+/// [msr_docs]: https://developer.arm.com/documentation/dui0489/i/arm-and-thumb-instructions/msr--arm-register-to-system-coprocessor-register-
 #[proc_macro]
-pub fn write_spsr(token_stream: TokenStream) -> TokenStream {
-  let trees: Vec<TokenTree> = token_stream.into_iter().collect();
-  let tree = match &trees[..] {
-    [tree] => tree,
-    _ => panic!("please provide only a single ident or string literal"),
-  };
-  let reg_name =
-    get_str_literal_content(tree).expect("input must be a string literal");
-  if !SPSR_ALLOWED_TARGET_REG_LIST.contains(&reg_name.as_str()) {
-    panic!("register name `{reg_name}` is not on the permitted list")
-  }
-  let output = format!("msr {reg_name}, SPSR");
-
-  TokenStream::from(TokenTree::Literal(Literal::string(&output)))
+pub fn write_spsr_from(token_stream: TokenStream) -> TokenStream {
+  write_spsr_from_impl::write_spsr_from_impl(token_stream)
 }
 
-/// Fakes a `blx` type of operation.
+/// ARMv4T lacks the actual `blx` instruction, so this performs a "fake"
+/// `blx`-styled operation.
 ///
-/// **Usage Example:**
-/// ```rust
-/// # use bracer::*;
-/// # let s =
-/// a32_fake_blx!("r0")
-/// # ;
-/// ```
+/// ## Input
+/// A single string literal that's an actual register name (eg: `"r0"`), or an
+/// assembly register substitution name (eg: `"{temp}"`).
 ///
+/// ## Output
 /// Emits a string literal of `a32` code like the following:
 /// ```arm
 /// adr lr .L_bracer_local_label_<id>
@@ -186,24 +100,7 @@ pub fn write_spsr(token_stream: TokenStream) -> TokenStream {
 /// to `lr` in `t32` state.
 #[proc_macro]
 pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
-  let trees: Vec<TokenTree> = token_stream.into_iter().collect();
-  let tree = match &trees[..] {
-    [tree] => tree,
-    _ => panic!("please provide only a single ident or string literal"),
-  };
-  let reg_name =
-    get_str_literal_content(tree).expect("input must be a string literal");
-  if !ANY_REG_NAME.contains(&reg_name.as_str()) {
-    panic!("register name `{reg_name}` is not on the permitted list")
-  }
-  let label = next_local_label();
-  let output = format!(
-    "adr lr, {label}
-    bx {reg_name}
-    {label}:"
-  );
-
-  TokenStream::from(TokenTree::Literal(Literal::string(&output)))
+  a32_fake_blx_impl::a32_fake_blx_impl(token_stream)
 }
 
 /// Places `.code 32` at the start and `.code 16` at the end of the input
@@ -324,12 +221,8 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
     ":",
     "after `irq_masked` must be a `:`"
   );
-  let i = match stream_iter.next().expect("too few tokens").to_string().as_str()
-  {
-    "true" => "1",
-    "false" => "0",
-    _ => panic!("`irq_masked` must be set as `true` or `false`"),
-  };
+  let i = get_bool(&stream_iter.next().expect("too few tokens"))
+    .expect("`irq_masked` must be set as `true` or `false`") as u8;
   assert_eq!(
     stream_iter.next().expect("too few tokens").to_string(),
     ",",
@@ -346,12 +239,8 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
     ":",
     "after `fiq_masked` must be a `:`"
   );
-  let f = match stream_iter.next().expect("too few tokens").to_string().as_str()
-  {
-    "true" => "1",
-    "false" => "0",
-    _ => panic!("`fiq_masked` must be set as `true` or `false`"),
-  };
+  let f = get_bool(&stream_iter.next().expect("too few tokens"))
+    .expect("`fiq_masked` must be set as `true` or `false`") as u8;
   assert!(stream_iter.next().is_none(), "too many tokens");
   TokenStream::from_iter(Some(TokenTree::Literal(Literal::string(&format!(
     "msr CPSR_c, #0b{i}{f}0{mode}"
@@ -394,9 +283,9 @@ pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn when(token_stream: TokenStream) -> TokenStream {
   let mut token_iter = token_stream.into_iter();
-  let test_group = as_group(token_iter.next().expect("too few tokens"))
+  let test_group = get_group(token_iter.next().expect("too few tokens"))
     .expect("must have a group for the test");
-  let body_group = as_group(token_iter.next().expect("too few tokens"))
+  let body_group = get_group(token_iter.next().expect("too few tokens"))
     .expect("must have a group for the body");
   assert!(token_iter.next().is_none(), "too many tokens");
   let mut out_buffer: Vec<TokenTree> = Vec::new();
@@ -408,9 +297,9 @@ pub fn when(token_stream: TokenStream) -> TokenStream {
       let test0 = get_str_literal_content(&test_trees[0])
         .expect("test0 must be a str literal");
       let test1 =
-        as_punct(test_trees[1].clone()).expect("test1 must be a punctuation");
+        get_punct(test_trees[1].clone()).expect("test1 must be a punctuation");
       let test2 =
-        as_punct(test_trees[2].clone()).expect("test2 must be a punctuation");
+        get_punct(test_trees[2].clone()).expect("test2 must be a punctuation");
       let test3 = get_str_literal_content(&test_trees[3])
         .expect("test3 must be a str literal");
       if test1 == '!' && test2 == '=' {
