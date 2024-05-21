@@ -143,6 +143,11 @@ pub fn write_spsr(token_stream: TokenStream) -> TokenStream {
 
 /// Fakes a `blx` type of operation.
 ///
+/// **Usage Example:**
+/// ```rust
+/// a32_fake_blx!("r0")
+/// ```
+///
 /// Emits a string literal of `a32` code like the following:
 /// ```arm
 /// adr lr .L_bracer_local_label_<id>
@@ -180,8 +185,18 @@ pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
 /// Places `.code 32` at the start and `.code 16` at the end of the input
 /// sequence.
 ///
+/// **Usage Example:**
+/// ```
+/// a32_within_t32! {
+///   "mov r0, #0",
+///   "str r1, [r0]",
+/// }
+/// ```
+///
 /// The input sequence should be zero or more expressions (comma separated) that
-/// could each normally be used within an `asm!` block.
+/// could each normally be used within an `asm!` block. The output is a single
+/// `concat!` expression, with newlines inserted for each input expression, and
+/// with the `.code` directives at the start and end.
 ///
 /// ## Safety
 /// You **must not** use this within an `a32` encoded assembly block. It will
