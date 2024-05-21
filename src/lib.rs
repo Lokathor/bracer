@@ -9,6 +9,14 @@
 //! something can be statically known to be "obviously" wrong (eg: an invalid
 //! register name is picked for a specific instruction) the macro will panic.
 
+/*
+
+TODO:
+when
+with_pushed_registers
+
+*/
+
 extern crate proc_macro;
 use core::{
   fmt::Write,
@@ -48,6 +56,19 @@ fn get_str_literal_content(tree: &TokenTree) -> Option<String> {
         None
       }
     }
+  }
+}
+
+fn as_group(tree: TokenTree) -> Option<Group> {
+  match tree {
+    TokenTree::Group(g) => Some(g),
+    _ => None,
+  }
+}
+fn as_punct(tree: TokenTree) -> Option<Punct> {
+  match tree {
+    TokenTree::Punct(p) => Some(p),
+    _ => None,
   }
 }
 
@@ -145,7 +166,10 @@ pub fn write_spsr(token_stream: TokenStream) -> TokenStream {
 ///
 /// **Usage Example:**
 /// ```rust
+/// # use bracer::*;
+/// # let s =
 /// a32_fake_blx!("r0")
+/// # ;
 /// ```
 ///
 /// Emits a string literal of `a32` code like the following:
@@ -187,10 +211,13 @@ pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
 ///
 /// **Usage Example:**
 /// ```
+/// # use bracer::*;
+/// # let s =
 /// a32_within_t32! {
 ///   "mov r0, #0",
 ///   "str r1, [r0]",
 /// }
+/// # ;
 /// ```
 ///
 /// The input sequence should be zero or more expressions (comma separated) that
@@ -210,9 +237,9 @@ pub fn a32_within_t32(token_stream: TokenStream) -> TokenStream {
   // `concat!`. The trick is that we need to be careful about where all the
   // commas are, because having two commas in a row within the `concat!`
   // argument list will cause an error.
-  let mut group_buffer: Vec<TokenTree> = Vec::new();
-  group_buffer.push(TokenTree::Literal(Literal::string(".code 32\n")));
-  group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+  let mut out_buffer: Vec<TokenTree> = Vec::new();
+  out_buffer.push(TokenTree::Literal(Literal::string(".code 32\n")));
+  out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
   for token_tree in token_stream {
     // We want the input of this proc-macro to "act like" you were giving input
     // directly to the `asm!` macro. This means that each comma between the
@@ -222,30 +249,30 @@ pub fn a32_within_t32(token_stream: TokenStream) -> TokenStream {
     // character's expression).
     match token_tree {
       TokenTree::Punct(p) if p == ',' => {
-        group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-        group_buffer.push(TokenTree::Literal(Literal::character('\n')));
-        group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        out_buffer.push(TokenTree::Literal(Literal::character('\n')));
+        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
       }
       _ => {
-        group_buffer.push(token_tree);
+        out_buffer.push(token_tree);
       }
     }
   }
   // check for a trailing comma in our group, if we DO NOT see one then we have
   // to apply a fix before placing the literal for the final `.code 16` line.
-  if !matches!(group_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
-    group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-    group_buffer.push(TokenTree::Literal(Literal::character('\n')));
-    group_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+  if !matches!(out_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
+    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+    out_buffer.push(TokenTree::Literal(Literal::character('\n')));
+    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
   }
-  group_buffer.push(TokenTree::Literal(Literal::string(".code 16\n")));
+  out_buffer.push(TokenTree::Literal(Literal::string(".code 16\n")));
 
   let concat_expr = vec![
     TokenTree::Ident(Ident::new("concat", Span::call_site())),
     TokenTree::Punct(Punct::new('!', Spacing::Alone)),
     TokenTree::Group(Group::new(
       Delimiter::Parenthesis,
-      TokenStream::from_iter(group_buffer),
+      TokenStream::from_iter(out_buffer),
     )),
   ];
 
@@ -329,4 +356,110 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
   TokenStream::from_iter(Some(TokenTree::Literal(Literal::string(&format!(
     "msr CPSR_c, #0b{i}{f}0{mode}"
   )))))
+}
+
+/// Emits a `.section` directive to place the code in a section name you pick.
+#[proc_macro]
+pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
+  let trees: Vec<TokenTree> = token_stream.into_iter().collect();
+  let tree = match &trees[..] {
+    [tree] => tree,
+    _ => panic!("please provide only a single ident or string literal"),
+  };
+  let section_name =
+    get_str_literal_content(tree).expect("input must be a string literal");
+  let output = format!(r#".section {section_name},"ax",%progbits"#);
+
+  TokenStream::from(TokenTree::Literal(Literal::string(&output)))
+}
+
+/// Emits code that will perform the test and skip past some lines if the test
+/// does not pass.
+///
+/// **Usage Example:**
+/// ```rust
+/// # use bracer::*;
+/// # let s =
+/// when!(("r0" != "#0"){
+///   "add r1, r2, r3",
+///   "add r0, r1, r4",
+/// })
+/// # ;
+/// ```
+///
+/// * The test to perform must be in one grouping.
+/// * The lines to execute when the test passes must be in a separate grouping.
+/// * The macro *does not* care what grouping markers you use, `()`, `[]`, and
+///   `{}` are all fine.
+#[proc_macro]
+pub fn when(token_stream: TokenStream) -> TokenStream {
+  let mut token_iter = token_stream.into_iter();
+  let test_group = as_group(token_iter.next().expect("too few tokens"))
+    .expect("must have a group for the test");
+  let body_group = as_group(token_iter.next().expect("too few tokens"))
+    .expect("must have a group for the body");
+  assert!(token_iter.next().is_none(), "too many tokens");
+  let mut out_buffer: Vec<TokenTree> = Vec::new();
+  let local_label = next_local_label();
+
+  let test_trees: Vec<TokenTree> = test_group.stream().into_iter().collect();
+  match test_trees.len() {
+    4 => {
+      let test0 = get_str_literal_content(&test_trees[0])
+        .expect("test0 must be a str literal");
+      let test1 =
+        as_punct(test_trees[1].clone()).expect("test1 must be a punctuation");
+      let test2 =
+        as_punct(test_trees[2].clone()).expect("test2 must be a punctuation");
+      let test3 = get_str_literal_content(&test_trees[3])
+        .expect("test3 must be a str literal");
+      if test1 == '!' && test2 == '=' {
+        out_buffer.push(TokenTree::Literal(Literal::string(&format!(
+          "cmp {test0}, {test3}\n"
+        ))));
+        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        out_buffer.push(TokenTree::Literal(Literal::string(&format!(
+          "bne {local_label}\n"
+        ))));
+        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+      } else {
+        panic!("unknown test expression")
+      }
+    }
+    other => panic!("bad number of test tokens: `{other}`"),
+  }
+
+  for token_tree in body_group.stream() {
+    match token_tree {
+      TokenTree::Punct(p) if p == ',' => {
+        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        out_buffer.push(TokenTree::Literal(Literal::character('\n')));
+        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+      }
+      _ => {
+        out_buffer.push(token_tree);
+      }
+    }
+  }
+
+  // check for a trailing comma in our group, if we DO NOT see one then we have
+  // to apply a fix before placing the ending label.
+  if !matches!(out_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
+    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+    out_buffer.push(TokenTree::Literal(Literal::character('\n')));
+    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+  }
+  out_buffer
+    .push(TokenTree::Literal(Literal::string(&format!("{local_label}\n"))));
+
+  let concat_expr = vec![
+    TokenTree::Ident(Ident::new("concat", Span::call_site())),
+    TokenTree::Punct(Punct::new('!', Spacing::Alone)),
+    TokenTree::Group(Group::new(
+      Delimiter::Parenthesis,
+      TokenStream::from_iter(out_buffer),
+    )),
+  ];
+
+  TokenStream::from_iter(concat_expr)
 }

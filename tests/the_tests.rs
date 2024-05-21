@@ -1,5 +1,6 @@
 use bracer::{
-  a32_fake_blx, a32_within_t32, read_spsr, set_cpu_control, write_spsr,
+  a32_fake_blx, a32_within_t32, put_fn_in_section, read_spsr, set_cpu_control,
+  when, write_spsr,
 };
 
 #[test]
@@ -94,4 +95,25 @@ fn test_set_cpu_control() {
   let actual =
     set_cpu_control!(Supervisor, irq_masked: true, fiq_masked: false);
   assert_eq!(expected, actual);
+}
+
+#[test]
+fn test_put_fn_in_section() {
+  let expected = ".section .iwram._start,\"ax\",%progbits";
+  let actual = put_fn_in_section!(".iwram._start");
+  assert_eq!(expected, actual);
+}
+
+#[test]
+fn test_when() {
+  let expected = "cmp reg, op2
+    b{cond} to label
+    add r1, r2, r3
+    add r0, r1, r4
+    .L_local_label_here:";
+  let actual = when!(("r0" != "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  assert_eq!(expected.lines().count(), actual.lines().count());
 }
