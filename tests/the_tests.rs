@@ -51,6 +51,25 @@ fn test_a32_fake_blx() {
 }
 
 #[test]
+fn test_put_fn_in_section() {
+  let expected = ".section .text._start,\"ax\",%progbits";
+  let actual = put_fn_in_section!(".text._start");
+  assert_eq!(expected, actual);
+}
+
+#[test]
+fn test_set_cpu_control() {
+  let expected = "msr CPSR_c, #0b00011111";
+  let actual = set_cpu_control!(System, irq_masked: false, fiq_masked: false);
+  assert_eq!(expected, actual);
+
+  let expected = "msr CPSR_c, #0b10010011";
+  let actual =
+    set_cpu_control!(Supervisor, irq_masked: true, fiq_masked: false);
+  assert_eq!(expected, actual);
+}
+
+#[test]
 fn test_a32_within_t32() {
   // test that the output works within an `asm!` invocation.
   unsafe {
@@ -84,25 +103,6 @@ fn test_a32_within_t32() {
   // test that the macro works on an empty input sequence.
   let expected = ".code 32\n.code 16\n";
   let actual = a32_within_t32!();
-  assert_eq!(expected, actual);
-}
-
-#[test]
-fn test_set_cpu_control() {
-  let expected = "msr CPSR_c, #0b00011111";
-  let actual = set_cpu_control!(System, irq_masked: false, fiq_masked: false);
-  assert_eq!(expected, actual);
-
-  let expected = "msr CPSR_c, #0b10010011";
-  let actual =
-    set_cpu_control!(Supervisor, irq_masked: true, fiq_masked: false);
-  assert_eq!(expected, actual);
-}
-
-#[test]
-fn test_put_fn_in_section() {
-  let expected = ".section .iwram._start,\"ax\",%progbits";
-  let actual = put_fn_in_section!(".iwram._start");
   assert_eq!(expected, actual);
 }
 

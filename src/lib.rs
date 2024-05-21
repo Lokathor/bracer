@@ -23,6 +23,7 @@ use proc_macro::{
 };
 
 mod a32_fake_blx_impl;
+mod put_fn_in_section_impl;
 mod read_spsr_to_impl;
 mod util;
 mod write_spsr_from_impl;
@@ -101,6 +102,22 @@ pub fn write_spsr_from(token_stream: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
   a32_fake_blx_impl::a32_fake_blx_impl(token_stream)
+}
+
+/// Emits a `.section` directive to place the code in a section name you pick.
+///
+/// Use this *before* the label for the function you're writing.
+///
+/// ## Input
+/// A string literal that's a valid section name. It should be alphanumeric,
+/// also `.` is allowed.
+///
+/// ## Output
+/// Emits a `.section` directive with the section name you specify and also
+/// properly marks the section as `allocated` and `executable`.
+#[proc_macro]
+pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
+  put_fn_in_section_impl::put_fn_in_section_impl(token_stream)
 }
 
 /// Places `.code 32` at the start and `.code 16` at the end of the input
@@ -245,21 +262,6 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
   TokenStream::from_iter(Some(TokenTree::Literal(Literal::string(&format!(
     "msr CPSR_c, #0b{i}{f}0{mode}"
   )))))
-}
-
-/// Emits a `.section` directive to place the code in a section name you pick.
-#[proc_macro]
-pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
-  let trees: Vec<TokenTree> = token_stream.into_iter().collect();
-  let tree = match &trees[..] {
-    [tree] => tree,
-    _ => panic!("please provide only a single ident or string literal"),
-  };
-  let section_name =
-    get_str_literal_content(tree).expect("input must be a string literal");
-  let output = format!(r#".section {section_name},"ax",%progbits"#);
-
-  TokenStream::from(TokenTree::Literal(Literal::string(&output)))
 }
 
 /// Emits code that will perform the test and skip past some lines if the test
