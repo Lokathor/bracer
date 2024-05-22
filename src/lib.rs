@@ -26,7 +26,7 @@ mod a32_read_spsr_to_impl;
 mod a32_set_cpu_control_impl;
 mod a32_write_spsr_from_impl;
 mod put_fn_in_section_impl;
-mod t32_with_an_a32_scope_impl;
+mod t32_with_a32_scope_impl;
 mod util;
 mod when_impl;
 
@@ -139,8 +139,8 @@ pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
 /// within an `a32` encoded assembly block. It will leave the assembler in a bad
 /// state after the assembly string, which is UB.
 #[proc_macro]
-pub fn t32_with_an_a32_scope(token_stream: TokenStream) -> TokenStream {
-  t32_with_an_a32_scope_impl::t32_with_an_a32_scope_impl(token_stream)
+pub fn t32_with_a32_scope(token_stream: TokenStream) -> TokenStream {
+  t32_with_a32_scope_impl::t32_with_a32_scope_impl(token_stream)
 }
 
 /// Generates the asm string to set the CPU control bits.

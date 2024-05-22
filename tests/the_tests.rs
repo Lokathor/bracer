@@ -1,6 +1,6 @@
 use bracer::{
   a32_fake_blx, a32_read_spsr_to, a32_set_cpu_control, a32_write_spsr_from,
-  put_fn_in_section, t32_with_an_a32_scope, when,
+  put_fn_in_section, t32_with_a32_scope, when,
 };
 
 #[test]
@@ -89,7 +89,7 @@ fn test_a32_within_t32() {
 
   // test that 'multi-line' input works (where there's a comma on the end)
   let expected = ".code 32\nmov r0, #0\nadd r0, r0, r0\n.code 16\n";
-  let actual = t32_with_an_a32_scope!(
+  let actual = t32_with_a32_scope!(
     // rustfmt stop making this one line
     "mov r0, #0",
     "add r0, r0, r0",
@@ -98,12 +98,12 @@ fn test_a32_within_t32() {
 
   // test that 'one line' of input works (with no comma on the end)
   let expected = ".code 32\nadd r0, r0, r0\n.code 16\n";
-  let actual = t32_with_an_a32_scope!("add r0, r0, r0");
+  let actual = t32_with_a32_scope!("add r0, r0, r0");
   assert_eq!(expected, actual);
 
   // test that the macro works on an empty input sequence.
   let expected = ".code 32\n.code 16\n";
-  let actual = t32_with_an_a32_scope!();
+  let actual = t32_with_a32_scope!();
   assert_eq!(expected, actual);
 }
 
