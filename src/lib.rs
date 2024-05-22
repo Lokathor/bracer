@@ -26,14 +26,9 @@ mod a32_fake_blx_impl;
 mod put_fn_in_section_impl;
 mod read_spsr_to_impl;
 mod util;
+mod when_impl;
 mod write_spsr_from_impl;
 use util::*;
-
-/// Generates a unique "local" label string.
-fn next_local_label() -> String {
-  static NEXT: AtomicU64 = AtomicU64::new(0);
-  format!(".L_bracer_local_label_{}", NEXT.fetch_add(1, Ordering::Relaxed))
-}
 
 /// Reads SPSR to the register given.
 ///
@@ -284,73 +279,5 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
 ///   `{}` are all fine.
 #[proc_macro]
 pub fn when(token_stream: TokenStream) -> TokenStream {
-  let mut token_iter = token_stream.into_iter();
-  let test_group = get_group(token_iter.next().expect("too few tokens"))
-    .expect("must have a group for the test");
-  let body_group = get_group(token_iter.next().expect("too few tokens"))
-    .expect("must have a group for the body");
-  assert!(token_iter.next().is_none(), "too many tokens");
-  let mut out_buffer: Vec<TokenTree> = Vec::new();
-  let local_label = next_local_label();
-
-  let test_trees: Vec<TokenTree> = test_group.stream().into_iter().collect();
-  match test_trees.len() {
-    4 => {
-      let test0 = get_str_literal_content(&test_trees[0])
-        .expect("test0 must be a str literal");
-      let test1 =
-        get_punct(test_trees[1].clone()).expect("test1 must be a punctuation");
-      let test2 =
-        get_punct(test_trees[2].clone()).expect("test2 must be a punctuation");
-      let test3 = get_str_literal_content(&test_trees[3])
-        .expect("test3 must be a str literal");
-      if test1 == '!' && test2 == '=' {
-        out_buffer.push(TokenTree::Literal(Literal::string(&format!(
-          "cmp {test0}, {test3}\n"
-        ))));
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-        out_buffer.push(TokenTree::Literal(Literal::string(&format!(
-          "bne {local_label}\n"
-        ))));
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-      } else {
-        panic!("unknown test expression")
-      }
-    }
-    other => panic!("bad number of test tokens: `{other}`"),
-  }
-
-  for token_tree in body_group.stream() {
-    match token_tree {
-      TokenTree::Punct(p) if p == ',' => {
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-        out_buffer.push(TokenTree::Literal(Literal::character('\n')));
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-      }
-      _ => {
-        out_buffer.push(token_tree);
-      }
-    }
-  }
-
-  // check for a trailing comma in our group, if we DO NOT see one then we have
-  // to apply a fix before placing the ending label.
-  if !matches!(out_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
-    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-    out_buffer.push(TokenTree::Literal(Literal::character('\n')));
-    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-  }
-  out_buffer
-    .push(TokenTree::Literal(Literal::string(&format!("{local_label}\n"))));
-
-  let concat_expr = vec![
-    TokenTree::Ident(Ident::new("concat", Span::call_site())),
-    TokenTree::Punct(Punct::new('!', Spacing::Alone)),
-    TokenTree::Group(Group::new(
-      Delimiter::Parenthesis,
-      TokenStream::from_iter(out_buffer),
-    )),
-  ];
-
-  TokenStream::from_iter(concat_expr)
+  when_impl::when_impl(token_stream)
 }

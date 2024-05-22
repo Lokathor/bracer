@@ -108,14 +108,62 @@ fn test_a32_within_t32() {
 
 #[test]
 fn test_when() {
-  let expected = "cmp reg, op2
-    b{cond} to label
+  // FIXME: testing the output when there's a unique label is a pain in the
+  // butt, but this test should inspect the generated string more closely.
+  let expected = "cmp r0, #0
+    beq .L_local_label_TESTMODE
     add r1, r2, r3
     add r0, r1, r4
-    .L_local_label_here:";
+    .L_local_label_TESTMODE:";
   let actual = when!(("r0" != "#0"){
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
   assert_eq!(expected.lines().count(), actual.lines().count());
+
+  // signedness doesn't matter
+  let _actual = when!(("r0" == "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" != "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+
+  // unsigned
+  let _actual = when!(("r0" >=u "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" <=u "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" <u "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" >u "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+
+  // signed
+  let _actual = when!(("r0" >=i "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" <=i "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" <i "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
+  let _actual = when!(("r0" >i "#0"){
+    "add r1, r2, r3",
+    "add r0, r1, r4",
+  });
 }

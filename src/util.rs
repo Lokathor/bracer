@@ -5,6 +5,12 @@ use super::*;
 const NOT_ENOUGH_INPUT: &str = "Not enough input";
 const ONE_STR_ONLY: &str = "Provide one string literal only.";
 
+/// Generates a unique "local" label string.
+pub fn next_local_label() -> String {
+  static NEXT: AtomicU64 = AtomicU64::new(0);
+  format!(".L_bracer_local_label_{}", NEXT.fetch_add(1, Ordering::Relaxed))
+}
+
 /// Gets out the `Group`, if any.
 pub fn get_group(tree: TokenTree) -> Option<Group> {
   match tree {
@@ -73,4 +79,50 @@ pub fn one_str_literal_or_panic(token_stream: TokenStream) -> String {
       .expect(ONE_STR_ONLY);
   assert!(stream_iter.next().is_none(), "{ONE_STR_ONLY}");
   literal
+}
+
+#[allow(clippy::enum_variant_names)]
+pub enum EzTokenTree {
+  EzGroup(Delimiter, Vec<EzTokenTree>),
+  EzId(String, Span),
+  EzPu(char, Spacing),
+  EzLi(String),
+}
+impl EzTokenTree {
+  pub fn get_literal(&self) -> Option<&str> {
+    match self {
+      Self::EzLi(s) => Some(s.as_str()),
+      _ => None,
+    }
+  }
+}
+impl From<TokenTree> for EzTokenTree {
+  fn from(value: TokenTree) -> Self {
+    match value {
+      TokenTree::Group(g) => EzTokenTree::EzGroup(
+        g.delimiter(),
+        g.stream().into_iter().map(EzTokenTree::from).collect(),
+      ),
+      TokenTree::Ident(i) => EzTokenTree::EzId(i.to_string(), i.span()),
+      TokenTree::Punct(p) => EzTokenTree::EzPu(p.as_char(), p.spacing()),
+      TokenTree::Literal(l) => EzTokenTree::EzLi(l.to_string()),
+    }
+  }
+}
+impl From<EzTokenTree> for TokenTree {
+  fn from(value: EzTokenTree) -> Self {
+    match value {
+      EzTokenTree::EzGroup(delimiter, trees) => TokenTree::Group(Group::new(
+        delimiter,
+        TokenStream::from_iter(trees.into_iter().map(TokenTree::from)),
+      )),
+      EzTokenTree::EzId(i, s) => TokenTree::Ident(Ident::new(&i, s)),
+      EzTokenTree::EzPu(ch, spacing) => {
+        TokenTree::Punct(Punct::new(ch, spacing))
+      }
+      EzTokenTree::EzLi(l) => {
+        TokenTree::Literal(Literal::from_str(&l).unwrap())
+      }
+    }
+  }
 }
