@@ -4,7 +4,7 @@ use bracer::{
 };
 
 #[test]
-fn test_read_spsr_to() {
+fn test_a32_read_spsr_to() {
   assert_eq!(a32_read_spsr_to!("r0"), "mrs r0, SPSR");
   assert_eq!(a32_read_spsr_to!("R0"), "mrs R0, SPSR");
   assert_eq!(a32_read_spsr_to!("lr"), "mrs lr, SPSR");
@@ -22,7 +22,7 @@ fn test_read_spsr_to() {
 }
 
 #[test]
-fn test_write_spsr_from() {
+fn test_a32_write_spsr_from() {
   assert_eq!(a32_write_spsr_from!("r0"), "msr r0, SPSR");
   assert_eq!(a32_write_spsr_from!("R0"), "msr R0, SPSR");
   assert_eq!(a32_write_spsr_from!("lr"), "msr lr, SPSR");
@@ -58,7 +58,7 @@ fn test_put_fn_in_section() {
 }
 
 #[test]
-fn test_set_cpu_control() {
+fn test_a32_set_cpu_control() {
   let expected = "msr CPSR_c, #0b00011111";
   let actual =
     a32_set_cpu_control!(System, irq_masked = false, fiq_masked = false);
@@ -71,12 +71,12 @@ fn test_set_cpu_control() {
 }
 
 #[test]
-fn test_a32_within_t32() {
+fn test_t32_with_a32_scope() {
   // test that the output works within an `asm!` invocation.
   unsafe {
     core::arch::asm!(
       "/*",
-      t32_with_an_a32_scope!(
+      t32_with_a32_scope!(
         // rustfmt stop making this one line
         "add r0, r0, r0",
         // make sure that we can call other macros within this macro
