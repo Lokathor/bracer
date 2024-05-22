@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn set_cpu_control_impl(token_stream: TokenStream) -> TokenStream {
+pub fn a32_set_cpu_control_impl(token_stream: TokenStream) -> TokenStream {
   let mut stream_iter = token_stream.into_iter();
   // CPSR low bits are: `I F T MMMMM`, and T must always be left as 0.
   let mode =

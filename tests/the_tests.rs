@@ -1,20 +1,20 @@
 use bracer::{
-  a32_fake_blx, a32_within_t32, put_fn_in_section, read_spsr_to,
-  set_cpu_control, when, write_spsr_from,
+  a32_fake_blx, a32_read_spsr_to, a32_set_cpu_control, a32_write_spsr_from,
+  put_fn_in_section, t32_with_an_a32_scope, when,
 };
 
 #[test]
 fn test_read_spsr_to() {
-  assert_eq!(read_spsr_to!("r0"), "mrs r0, SPSR");
-  assert_eq!(read_spsr_to!("R0"), "mrs R0, SPSR");
-  assert_eq!(read_spsr_to!("lr"), "mrs lr, SPSR");
-  assert_eq!(read_spsr_to!("{temp}"), "mrs {temp}, SPSR");
+  assert_eq!(a32_read_spsr_to!("r0"), "mrs r0, SPSR");
+  assert_eq!(a32_read_spsr_to!("R0"), "mrs R0, SPSR");
+  assert_eq!(a32_read_spsr_to!("lr"), "mrs lr, SPSR");
+  assert_eq!(a32_read_spsr_to!("{temp}"), "mrs {temp}, SPSR");
 
   unsafe {
     core::arch::asm!(
       // rustfmt stop making this one line
       "/*",
-      read_spsr_to!("r0"),
+      a32_read_spsr_to!("r0"),
       "*/",
       options(nostack)
     )
@@ -23,10 +23,10 @@ fn test_read_spsr_to() {
 
 #[test]
 fn test_write_spsr_from() {
-  assert_eq!(write_spsr_from!("r0"), "msr r0, SPSR");
-  assert_eq!(write_spsr_from!("R0"), "msr R0, SPSR");
-  assert_eq!(write_spsr_from!("lr"), "msr lr, SPSR");
-  assert_eq!(write_spsr_from!("{temp}"), "msr {temp}, SPSR");
+  assert_eq!(a32_write_spsr_from!("r0"), "msr r0, SPSR");
+  assert_eq!(a32_write_spsr_from!("R0"), "msr R0, SPSR");
+  assert_eq!(a32_write_spsr_from!("lr"), "msr lr, SPSR");
+  assert_eq!(a32_write_spsr_from!("{temp}"), "msr {temp}, SPSR");
 }
 
 #[test]
@@ -60,12 +60,13 @@ fn test_put_fn_in_section() {
 #[test]
 fn test_set_cpu_control() {
   let expected = "msr CPSR_c, #0b00011111";
-  let actual = set_cpu_control!(System, irq_masked = false, fiq_masked = false);
+  let actual =
+    a32_set_cpu_control!(System, irq_masked = false, fiq_masked = false);
   assert_eq!(expected, actual);
 
   let expected = "msr CPSR_c, #0b10010011";
   let actual =
-    set_cpu_control!(Supervisor, irq_masked = true, fiq_masked = false);
+    a32_set_cpu_control!(Supervisor, irq_masked = true, fiq_masked = false);
   assert_eq!(expected, actual);
 }
 
@@ -75,11 +76,11 @@ fn test_a32_within_t32() {
   unsafe {
     core::arch::asm!(
       "/*",
-      a32_within_t32!(
+      t32_with_an_a32_scope!(
         // rustfmt stop making this one line
         "add r0, r0, r0",
         // make sure that we can call other macros within this macro
-        read_spsr_to!("r0"),
+        a32_read_spsr_to!("r0"),
       ),
       "*/",
       options(nostack)
@@ -88,7 +89,7 @@ fn test_a32_within_t32() {
 
   // test that 'multi-line' input works (where there's a comma on the end)
   let expected = ".code 32\nmov r0, #0\nadd r0, r0, r0\n.code 16\n";
-  let actual = a32_within_t32!(
+  let actual = t32_with_an_a32_scope!(
     // rustfmt stop making this one line
     "mov r0, #0",
     "add r0, r0, r0",
@@ -97,12 +98,12 @@ fn test_a32_within_t32() {
 
   // test that 'one line' of input works (with no comma on the end)
   let expected = ".code 32\nadd r0, r0, r0\n.code 16\n";
-  let actual = a32_within_t32!("add r0, r0, r0");
+  let actual = t32_with_an_a32_scope!("add r0, r0, r0");
   assert_eq!(expected, actual);
 
   // test that the macro works on an empty input sequence.
   let expected = ".code 32\n.code 16\n";
-  let actual = a32_within_t32!();
+  let actual = t32_with_an_a32_scope!();
   assert_eq!(expected, actual);
 }
 

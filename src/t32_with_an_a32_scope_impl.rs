@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn a32_within_t32_impl(token_stream: TokenStream) -> TokenStream {
+pub fn t32_with_an_a32_scope_impl(token_stream: TokenStream) -> TokenStream {
   let mut out_buffer: Vec<TokenTree> = Vec::new();
   out_buffer.push(TokenTree::Literal(Literal::string(".code 32\n")));
   out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
