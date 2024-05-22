@@ -21,14 +21,15 @@ use proc_macro::{
   Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream,
   TokenTree,
 };
+use util::*;
 
 mod a32_fake_blx_impl;
+mod a32_within_t32_impl;
 mod put_fn_in_section_impl;
 mod read_spsr_to_impl;
 mod util;
 mod when_impl;
 mod write_spsr_from_impl;
-use util::*;
 
 /// Reads SPSR to the register given.
 ///
@@ -139,59 +140,15 @@ pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
 /// leave the assembler in a bad state after the assembly string, which is UB.
 #[proc_macro]
 pub fn a32_within_t32(token_stream: TokenStream) -> TokenStream {
-  // Note(Lokathor): The output of this macro has to be "one expression", so we
-  // look through the comma separated list of input expressions and then re-emit
-  // everything as a single `concat!` expresion. For each input expression we
-  // get, we want to put that expression followed by a newline into the output
-  // `concat!`. The trick is that we need to be careful about where all the
-  // commas are, because having two commas in a row within the `concat!`
-  // argument list will cause an error.
-  let mut out_buffer: Vec<TokenTree> = Vec::new();
-  out_buffer.push(TokenTree::Literal(Literal::string(".code 32\n")));
-  out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-  for token_tree in token_stream {
-    // We want the input of this proc-macro to "act like" you were giving input
-    // directly to the `asm!` macro. This means that each comma between the
-    // input expressions has to act like a newline within the fully concatinated
-    // output. Whenever we see a comma in the input, we insert that *and also*
-    // we insert a newline character (followed by a comma for the newline
-    // character's expression).
-    match token_tree {
-      TokenTree::Punct(p) if p == ',' => {
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-        out_buffer.push(TokenTree::Literal(Literal::character('\n')));
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-      }
-      _ => {
-        out_buffer.push(token_tree);
-      }
-    }
-  }
-  // check for a trailing comma in our group, if we DO NOT see one then we have
-  // to apply a fix before placing the literal for the final `.code 16` line.
-  if !matches!(out_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
-    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-    out_buffer.push(TokenTree::Literal(Literal::character('\n')));
-    out_buffer.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
-  }
-  out_buffer.push(TokenTree::Literal(Literal::string(".code 16\n")));
-
-  let concat_expr = vec![
-    TokenTree::Ident(Ident::new("concat", Span::call_site())),
-    TokenTree::Punct(Punct::new('!', Spacing::Alone)),
-    TokenTree::Group(Group::new(
-      Delimiter::Parenthesis,
-      TokenStream::from_iter(out_buffer),
-    )),
-  ];
-
-  TokenStream::from_iter(concat_expr)
+  a32_within_t32_impl::a32_within_t32_impl(token_stream)
 }
 
 /// Generates the asm string to set the CPU control bits.
 ///
-/// Input must be of the form: `{mode_name}, irq_masked: {bool}, fiq_masked:
-/// {bool}`
+/// Input must be of the form:
+/// ```text
+/// {mode_name}, irq_masked = {bool}, fiq_masked = {bool}
+/// ```
 ///
 /// Valid mode names are the long name or short name of a CPU mode:
 /// * User / usr
@@ -230,8 +187,8 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
   );
   assert_eq!(
     stream_iter.next().expect("too few tokens").to_string(),
-    ":",
-    "after `irq_masked` must be a `:`"
+    "=",
+    "after `irq_masked` must be a `=`"
   );
   let i = get_bool(&stream_iter.next().expect("too few tokens"))
     .expect("`irq_masked` must be set as `true` or `false`") as u8;
@@ -248,8 +205,8 @@ pub fn set_cpu_control(token_stream: TokenStream) -> TokenStream {
   );
   assert_eq!(
     stream_iter.next().expect("too few tokens").to_string(),
-    ":",
-    "after `fiq_masked` must be a `:`"
+    "=",
+    "after `fiq_masked` must be a `=`"
   );
   let f = get_bool(&stream_iter.next().expect("too few tokens"))
     .expect("`fiq_masked` must be set as `true` or `false`") as u8;

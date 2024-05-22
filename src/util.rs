@@ -126,3 +126,50 @@ impl From<EzTokenTree> for TokenTree {
     }
   }
 }
+
+/// Extends a list of expressions intended for `concat!` with the iterator
+/// given.
+///
+/// Every time the iterator produces `,` in the sequence, this will insert a
+/// comma, then newline, then another comma. This causes the resulting concat to
+/// treat each input expression as its own line.
+///
+/// * The function will always have a trailing `,` placed at the end of the
+///   expression list as long as the list is non-empty.
+/// * The input list to extend does *not* need to already have a trailing comma
+///   when the function is called.
+pub fn extend_concat_as_lines(
+  concat_exprs: &mut Vec<TokenTree>, iter: impl IntoIterator<Item = TokenTree>,
+) {
+  // If there is a last element, and it's not a `,`, then we insert the comma
+  // for the last expression and also a newline and comma for the newline.
+  if let Some(tree) = concat_exprs.last() {
+    if !matches!(tree, TokenTree::Punct(p) if *p == ',') {
+      concat_exprs.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+      concat_exprs.push(TokenTree::Literal(Literal::character('\n')));
+      concat_exprs.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+    }
+  }
+
+  for token_tree in iter {
+    match token_tree {
+      TokenTree::Punct(p) if p == ',' => {
+        concat_exprs.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+        concat_exprs.push(TokenTree::Literal(Literal::character('\n')));
+        concat_exprs.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+      }
+      _ => {
+        concat_exprs.push(token_tree);
+      }
+    }
+  }
+
+  // After all the expressions we added, we need to check for another cleanup
+  if let Some(tree) = concat_exprs.last() {
+    if !matches!(tree, TokenTree::Punct(p) if *p == ',') {
+      concat_exprs.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+      concat_exprs.push(TokenTree::Literal(Literal::character('\n')));
+      concat_exprs.push(TokenTree::Punct(Punct::new(',', Spacing::Alone)));
+    }
+  }
+}

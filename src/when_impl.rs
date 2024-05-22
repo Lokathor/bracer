@@ -1,19 +1,21 @@
 use super::*;
 
 pub fn when_impl(token_stream: TokenStream) -> TokenStream {
+  use EzTokenTree::*;
+  use Spacing::*;
+
   let mut token_iter = token_stream.into_iter();
   let test_group = get_group(token_iter.next().expect("too few tokens"))
     .expect("must have a group for the test");
   let body_group = get_group(token_iter.next().expect("too few tokens"))
     .expect("must have a group for the body");
   assert!(token_iter.next().is_none(), "too many tokens");
+
   let mut out_buffer: Vec<TokenTree> = Vec::new();
   let local_label = next_local_label();
 
   let test_trees: Vec<EzTokenTree> =
     test_group.stream().into_iter().map(EzTokenTree::from).collect();
-  use EzTokenTree::*;
-  use Spacing::*;
   // We're branching when the test *does not* pass, so for example when the
   // users passes in `==` we branch using the inverted case's condition, `ne`
   #[allow(unused_variables)]
@@ -59,26 +61,8 @@ pub fn when_impl(token_stream: TokenStream) -> TokenStream {
   ))));
   out_buffer.push(TokenTree::Punct(Punct::new(',', Alone)));
 
-  for token_tree in body_group.stream() {
-    match token_tree {
-      TokenTree::Punct(p) if p == ',' => {
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Alone)));
-        out_buffer.push(TokenTree::Literal(Literal::character('\n')));
-        out_buffer.push(TokenTree::Punct(Punct::new(',', Alone)));
-      }
-      _ => {
-        out_buffer.push(token_tree);
-      }
-    }
-  }
-
-  // check for a trailing comma in our group, if we DO NOT see one then we have
-  // to apply a fix before placing the ending label.
-  if !matches!(out_buffer.last().unwrap(), TokenTree::Punct(p) if *p == ',') {
-    out_buffer.push(TokenTree::Punct(Punct::new(',', Alone)));
-    out_buffer.push(TokenTree::Literal(Literal::character('\n')));
-    out_buffer.push(TokenTree::Punct(Punct::new(',', Alone)));
-  }
+  extend_concat_as_lines(&mut out_buffer, body_group.stream());
+  // the above fn always leaves a trailing comma, no need for a secondary check.
   out_buffer
     .push(TokenTree::Literal(Literal::string(&format!("{local_label}:\n"))));
 

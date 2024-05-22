@@ -60,12 +60,12 @@ fn test_put_fn_in_section() {
 #[test]
 fn test_set_cpu_control() {
   let expected = "msr CPSR_c, #0b00011111";
-  let actual = set_cpu_control!(System, irq_masked: false, fiq_masked: false);
+  let actual = set_cpu_control!(System, irq_masked = false, fiq_masked = false);
   assert_eq!(expected, actual);
 
   let expected = "msr CPSR_c, #0b10010011";
   let actual =
-    set_cpu_control!(Supervisor, irq_masked: true, fiq_masked: false);
+    set_cpu_control!(Supervisor, irq_masked = true, fiq_masked = false);
   assert_eq!(expected, actual);
 }
 
