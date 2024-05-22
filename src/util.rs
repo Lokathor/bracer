@@ -95,6 +95,18 @@ impl EzTokenTree {
       _ => None,
     }
   }
+  pub fn get_str_literal_content(&self) -> Option<&str> {
+    match self {
+      Self::EzLi(s) => {
+        if s.starts_with('"') && s.ends_with('"') {
+          Some(&s[..s.len() - 1][1..])
+        } else {
+          None
+        }
+      }
+      _ => None,
+    }
+  }
 }
 impl From<TokenTree> for EzTokenTree {
   fn from(value: TokenTree) -> Self {

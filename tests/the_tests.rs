@@ -121,6 +121,7 @@ fn test_when() {
     "add r0, r1, r4",
   });
   assert_eq!(expected.lines().count(), actual.lines().count());
+  assert_eq!(actual.lines().next().unwrap(), "cmp r0, #0");
 
   // signedness doesn't matter
   let _actual = when!(("r0" == "#0"){

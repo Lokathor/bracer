@@ -53,8 +53,16 @@ pub fn when_impl(token_stream: TokenStream) -> TokenStream {
     [EzLi(lhs), EzPu('>', Alone), EzId(i, _), EzLi(op2)] if i == "i" => "le",
     _ => panic!("unknown test expression"),
   };
-  let lhs = test_trees.first().unwrap().get_literal().unwrap();
-  let op2 = test_trees.last().unwrap().get_literal().unwrap();
+  let lhs = test_trees
+    .first()
+    .unwrap()
+    .get_str_literal_content()
+    .expect("test input must be a str literal");
+  let op2 = test_trees
+    .last()
+    .unwrap()
+    .get_str_literal_content()
+    .expect("test input must be a str literal");
   out_buffer.push(TokenTree::Literal(Literal::string(&format!(
     "cmp {lhs}, {op2}
     b{cond} {local_label}\n"

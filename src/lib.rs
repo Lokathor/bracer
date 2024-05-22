@@ -118,21 +118,13 @@ pub fn put_fn_in_section(token_stream: TokenStream) -> TokenStream {
 /// Places `.code 32` at the start and `.code 16` at the end of the input
 /// sequence.
 ///
-/// **Usage Example:**
-/// ```
-/// # use bracer::*;
-/// # let s =
-/// a32_within_t32! {
-///   "mov r0, #0",
-///   "str r1, [r0]",
-/// }
-/// # ;
-/// ```
-///
+/// ## Input
 /// The input sequence should be zero or more expressions (comma separated) that
-/// could each normally be used within an `asm!` block. The output is a single
-/// `concat!` expression, with newlines inserted for each input expression, and
-/// with the `.code` directives at the start and end.
+/// could each normally be used within an `asm!` block.
+///
+/// ## Output
+/// A single `concat!` expression, with newlines inserted for each input
+/// expression, and with the `.code` directives at the start and end.
 ///
 /// ## Safety
 /// You **must* use this within `t32` code only. You **must not** use this
