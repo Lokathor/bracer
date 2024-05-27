@@ -5,12 +5,6 @@ use super::*;
 const NOT_ENOUGH_INPUT: &str = "Not enough input";
 const ONE_STR_ONLY: &str = "Provide one string literal only.";
 
-/// Generates a unique "local" label string.
-pub fn next_local_label() -> String {
-  static NEXT: AtomicU64 = AtomicU64::new(0);
-  format!(".L_bracer_local_label_{}", NEXT.fetch_add(1, Ordering::Relaxed))
-}
-
 /// Gets out the `Group`, if any.
 pub fn get_group(tree: TokenTree) -> Option<Group> {
   match tree {

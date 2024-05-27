@@ -31,23 +31,9 @@ fn test_a32_write_spsr_from() {
 
 #[test]
 fn test_a32_fake_blx() {
-  let asm_lines = a32_fake_blx!("r0");
-  let mut lines = asm_lines.lines();
-  let mut line = lines.next().unwrap();
-  let mut line_iter = line.split(' ');
-
-  assert_eq!(line_iter.next().unwrap(), "adr");
-  assert_eq!(line_iter.next().unwrap(), "lr,");
-  let local_label = line_iter.next().unwrap();
-  assert!(line_iter.next().is_none());
-
-  line = lines.next().unwrap();
-  assert_eq!(line.trim(), "bx r0");
-
-  line = lines.next().unwrap();
-  assert_eq!(line.trim(), format!("{local_label}:"));
-
-  assert!(lines.next().is_none());
+  let expected = concat!("add lr, pc, #0\n", "bx r12",);
+  let actual = a32_fake_blx!("r12");
+  assert_eq!(expected, actual);
 }
 
 #[test]
@@ -109,62 +95,61 @@ fn test_t32_with_a32_scope() {
 
 #[test]
 fn test_when() {
-  // FIXME: testing the output when there's a unique label is a pain in the
-  // butt, but this test should inspect the generated string more closely.
-  let expected = "cmp r0, #0
-    beq .L_local_label_TESTMODE
-    add r1, r2, r3
-    add r0, r1, r4
-    .L_local_label_TESTMODE:";
-  let actual = when!(("r0" != "#0"){
+  let expected = concat!(
+    "cmp r0, #0\n",
+    "beq 1f\n",
+    "add r1, r2, r3\n",
+    "add r0, r1, r4\n",
+    "1:\n"
+  );
+  let actual = when!(("r0" != "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  assert_eq!(expected.lines().count(), actual.lines().count());
-  assert_eq!(actual.lines().next().unwrap(), "cmp r0, #0");
+  assert_eq!(expected, actual);
 
   // signedness doesn't matter
-  let _actual = when!(("r0" == "#0"){
+  let _actual = when!(("r0" == "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" != "#0"){
+  let _actual = when!(("r0" != "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
 
   // unsigned
-  let _actual = when!(("r0" >=u "#0"){
+  let _actual = when!(("r0" >=u "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" <=u "#0"){
+  let _actual = when!(("r0" <=u "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" <u "#0"){
+  let _actual = when!(("r0" <u "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" >u "#0"){
+  let _actual = when!(("r0" >u "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
 
   // signed
-  let _actual = when!(("r0" >=i "#0"){
+  let _actual = when!(("r0" >=i "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" <=i "#0"){
+  let _actual = when!(("r0" <=i "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" <i "#0"){
+  let _actual = when!(("r0" <i "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });
-  let _actual = when!(("r0" >i "#0"){
+  let _actual = when!(("r0" >i "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
   });

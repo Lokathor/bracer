@@ -7,12 +7,25 @@ pub fn when_impl(token_stream: TokenStream) -> TokenStream {
   let mut token_iter = token_stream.into_iter();
   let test_group = get_group(token_iter.next().expect("too few tokens"))
     .expect("must have a group for the test");
+  let label_group = get_group(token_iter.next().expect("too few tokens"))
+    .expect("must have a group for the label");
   let body_group = get_group(token_iter.next().expect("too few tokens"))
     .expect("must have a group for the body");
   assert!(token_iter.next().is_none(), "too many tokens");
 
   let mut out_buffer: Vec<TokenTree> = Vec::new();
-  let local_label = next_local_label();
+
+  let label_trees: Vec<EzTokenTree> =
+    label_group.stream().into_iter().map(EzTokenTree::from).collect();
+  let local_label: u32 = match label_trees.as_slice() {
+    [EzLi(l)] => {
+      let f = l.to_string();
+      f.parse::<u32>().expect("literal must be a valid u32")
+    }
+    _ => {
+      panic!("please provide only 1 literal for the label")
+    }
+  };
 
   let test_trees: Vec<EzTokenTree> =
     test_group.stream().into_iter().map(EzTokenTree::from).collect();
@@ -64,8 +77,7 @@ pub fn when_impl(token_stream: TokenStream) -> TokenStream {
     .get_str_literal_content()
     .expect("test input must be a str literal");
   out_buffer.push(TokenTree::Literal(Literal::string(&format!(
-    "cmp {lhs}, {op2}
-    b{cond} {local_label}\n"
+    "cmp {lhs}, {op2}\nb{cond} {local_label}f\n"
   ))));
   out_buffer.push(TokenTree::Punct(Punct::new(',', Alone)));
 

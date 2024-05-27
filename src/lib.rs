@@ -84,16 +84,11 @@ pub fn a32_write_spsr_from(token_stream: TokenStream) -> TokenStream {
 /// ## Output
 /// Emits a string literal of `a32` code like the following:
 /// ```arm
-/// adr lr .L_bracer_local_label_<id>
+/// add lr, pc, #0 // set `lr` to just after the `bx`
 /// bx <reg>
-/// .L_bracer_local_label_<id>:
 /// ```
 ///
-/// Every expansion uses a uniquely generated local label id, so this shouldn't
-/// ever clash with any other code.
-///
-/// This can only be used in `a32` state, because you can't move values directly
-/// to `lr` in `t32` state.
+/// This assembly is only correct in `a32` state.
 #[proc_macro]
 pub fn a32_fake_blx(token_stream: TokenStream) -> TokenStream {
   a32_fake_blx_impl::a32_fake_blx_impl(token_stream)
@@ -163,7 +158,7 @@ pub fn a32_set_cpu_control(token_stream: TokenStream) -> TokenStream {
 /// ```rust
 /// # use bracer::*;
 /// # let s =
-/// when!(("r0" != "#0"){
+/// when!(("r0" != "#0")[1]{
 ///   "add r1, r2, r3",
 ///   "add r0, r1, r4",
 /// })
@@ -171,6 +166,8 @@ pub fn a32_set_cpu_control(token_stream: TokenStream) -> TokenStream {
 /// ```
 ///
 /// * The test to perform must be in one grouping.
+/// * The number literal for the numeric label placed at the end of the block
+///   must be another grouping.
 /// * The lines to execute when the test passes must be in a separate grouping.
 /// * The macro *does not* care what grouping markers you use, `()`, `[]`, and
 ///   `{}` are all fine.
