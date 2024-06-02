@@ -23,10 +23,10 @@ fn test_a32_read_spsr_to() {
 
 #[test]
 fn test_a32_write_spsr_from() {
-  assert_eq!(a32_write_spsr_from!("r0"), "msr r0, SPSR");
-  assert_eq!(a32_write_spsr_from!("R0"), "msr R0, SPSR");
-  assert_eq!(a32_write_spsr_from!("lr"), "msr lr, SPSR");
-  assert_eq!(a32_write_spsr_from!("{temp}"), "msr {temp}, SPSR");
+  assert_eq!(a32_write_spsr_from!("r0"), "msr SPSR, r0");
+  assert_eq!(a32_write_spsr_from!("R0"), "msr SPSR, R0");
+  assert_eq!(a32_write_spsr_from!("lr"), "msr SPSR, lr");
+  assert_eq!(a32_write_spsr_from!("{temp}"), "msr SPSR, {temp}");
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn test_when() {
   });
   assert_eq!(expected, actual);
 
-  // signedness doesn't matter
+  // signed-ness doesn't matter
   let _actual = when!(("r0" == "#0")[1]{
     "add r1, r2, r3",
     "add r0, r1, r4",
