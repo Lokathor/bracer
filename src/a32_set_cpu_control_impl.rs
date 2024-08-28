@@ -3,6 +3,9 @@ use super::*;
 pub fn a32_set_cpu_control_impl(token_stream: TokenStream) -> TokenStream {
   let mut stream_iter = token_stream.into_iter();
   // CPSR low bits are: `I F T MMMMM`, and T must always be left as 0.
+
+  // processor modes bits reference:
+  // https://developer.arm.com/documentation/ddi0406/c/System-Level-Architecture/The-System-Level-Programmers--Model/ARM-processor-modes-and-ARM-core-registers/ARM-processor-modes?lang=en
   let mode =
     match stream_iter.next().expect("too few tokens").to_string().as_str() {
       "User" | "usr" => "10000",
