@@ -178,7 +178,7 @@ macro_rules! set_cpu_control {
     "msr CPSR_c, #0b00011111\n"
   };
   (Supervisor, irq_masked: true, fiq_masked: false) => {
-    "msr CPSR_c, #0b10010010\n"
+    "msr CPSR_c, #0b10010011\n"
   };
 }
 
