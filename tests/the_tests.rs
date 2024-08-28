@@ -50,6 +50,21 @@ fn test_a32_set_cpu_control() {
     a32_set_cpu_control!(System, irq_masked = false, fiq_masked = false);
   assert_eq!(expected, actual);
 
+  let expected = "msr CPSR_c, #0b10011111";
+  let actual =
+    a32_set_cpu_control!(System, irq_masked = true, fiq_masked = false);
+  assert_eq!(expected, actual);
+
+  let expected = "msr CPSR_c, #0b01011111";
+  let actual =
+    a32_set_cpu_control!(System, irq_masked = false, fiq_masked = true);
+  assert_eq!(expected, actual);
+
+  let expected = "msr CPSR_c, #0b11011111";
+  let actual =
+    a32_set_cpu_control!(System, irq_masked = true, fiq_masked = true);
+  assert_eq!(expected, actual);
+
   let expected = "msr CPSR_c, #0b10010011";
   let actual =
     a32_set_cpu_control!(Supervisor, irq_masked = true, fiq_masked = false);
